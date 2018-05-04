@@ -1,0 +1,13 @@
+{
+  "name": "vue-drag-drop",
+  "version": "1.0.0",
+  "description": "A Vue.js directive that providing drag and drop capability, both mouse and touch are supported",
+  "author": "troy",
+  "dependencies": {
+    "lodash": "^4.17.5",
+    "vue": "^2.5.16"
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.14.108"
+  }
+}
