@@ -17,30 +17,33 @@ This library use MouseEvent and TouchEvent (for IE 10+ using PointerEvent), so i
 
 ```html
 <template>
-    <div v-drag-drop="handler" style="width:100px;height:100px;background:black;position:absolute;" :style="{left:x, top:y}"></div>
+    <div v-drag-drop="handler"
+         style="width:100px;height:100px;background:black;position:absolute;" 
+         :style="{left:x+'px', top:y+'px'}">
+    </div>
 </template>
 
 <script>
-import dragDrop from "./drag.drop";
+import DragDrop from "./drag.drop";
 
 export default {
+  directives: {
+    DragDrop,
+  },
   data() {
     return {
       x: 0,
-      y: 0
+      y: 0,
     };
-  },
-  directives: {
-    DragDrop
   },
   computed: {
     handler() {
       return {
         down: this.down,
         move: this.move,
-        up: this.up
+        up: this.up,
       };
-    }
+    },
   },
   methods: {
     down(ne, e) {
@@ -48,13 +51,13 @@ export default {
     },
     move(movement, ne, e) {
       // hander here
-      x += movement.x;
-      y += movement.y;
+      this.x += movement.x;
+      this.y += movement.y;
     },
     up(moved, ne, e) {
       // hander here
-    }
-  }
+    },
+  },
 };
 <script>
 ```
