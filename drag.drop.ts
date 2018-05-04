@@ -37,22 +37,16 @@ export interface Pos {
   y: number;
 }
 
+export type UniEvent = MouseEvent | TouchEvent | PointerEvent;
+
 export interface DragDropCallback {
-  down?: (ne: NormalizedEvent, e: MouseEvent | TouchEvent) => boolean | void;
-  move?: (
-    movement: Pos,
-    ne: NormalizedEvent,
-    e: MouseEvent | TouchEvent
-  ) => void;
-  up?: (
-    moved: boolean,
-    ne: NormalizedEvent,
-    e: MouseEvent | TouchEvent
-  ) => void;
+  down?: (ne: NormalizedEvent, e: UniEvent) => boolean | void;
+  move?: (movement: Pos, ne: NormalizedEvent, e: UniEvent) => void;
+  up?: (moved: boolean, ne: NormalizedEvent, e: UniEvent) => void;
 }
 
 // make pointer/mouse/touch events the same for use
-const normalizeEvent = (e: MouseEvent | TouchEvent): NormalizedEvent => {
+const normalizeEvent = (e: UniEvent): NormalizedEvent => {
   e.preventDefault();
   e.stopPropagation();
 
@@ -95,7 +89,7 @@ const bind: DirectiveFunction = (el, binding) => {
   let previousEvent: NormalizedEvent;
   let downEvent: NormalizedEvent;
 
-  const handleEventDown = (e: MouseEvent | TouchEvent): void => {
+  const handleEventDown = (e: UniEvent): void => {
     previousEvent = normalizeEvent(e);
     downEvent = previousEvent;
 
@@ -111,7 +105,7 @@ const bind: DirectiveFunction = (el, binding) => {
     bindEvents("up", body, true);
   };
 
-  const handleEventMove = throttle((e: MouseEvent | TouchEvent) => {
+  const handleEventMove = throttle((e: UniEvent) => {
     const ne = normalizeEvent(e);
 
     // note: modern browser support e.movementX & e.movementY as movement,
@@ -130,7 +124,7 @@ const bind: DirectiveFunction = (el, binding) => {
     previousEvent = ne;
   }, 60);
 
-  const handleEventUp = (e: MouseEvent | TouchEvent) => {
+  const handleEventUp = (e: UniEvent) => {
     // important: should cancel throttle after event up
     handleEventMove.cancel();
 
@@ -149,7 +143,7 @@ const bind: DirectiveFunction = (el, binding) => {
     unbindEvents("up", body, true);
   };
 
-  const handleEvents: Dictionary<(e: MouseEvent | TouchEvent) => void> = {
+  const handleEvents: Dictionary<(e: UniEvent) => void> = {
     down: handleEventDown,
     move: handleEventMove,
     up: handleEventUp
