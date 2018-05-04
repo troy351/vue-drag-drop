@@ -5,7 +5,7 @@ Compatible with IE 10+
 
 ### Install
 
-use `drag.drop.js` for JavaScript users
+use `drag.drop.js` for JavaScript users,
 use `drag.drop.ts` for TypeScript users
 
 ### Advantage
