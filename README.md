@@ -61,7 +61,7 @@ export default {
 
 ### Doc
 
-** see the TypeScript version for more details **
+**see the TypeScript version for more details**
 
 * `e`: the original event, depending on which event triggered
 * `ne`: NormalizedEvent, make MouseEvent/TouchEvent/PointerEvent all the same format, see detail below
