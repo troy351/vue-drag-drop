@@ -32,7 +32,7 @@ export interface NormalizedEvent {
   meta: boolean;
 }
 
-export interface Pos {
+export interface Coord {
   x: number;
   y: number;
 }
@@ -41,7 +41,7 @@ export type UniEvent = MouseEvent | TouchEvent | PointerEvent;
 
 export interface DragDropCallback {
   down?: (ne: NormalizedEvent, e: UniEvent) => boolean | void;
-  move?: (movement: Pos, ne: NormalizedEvent, e: UniEvent) => void;
+  move?: (movement: Coord, ne: NormalizedEvent, e: UniEvent) => void;
   up?: (moved: boolean, ne: NormalizedEvent, e: UniEvent) => void;
 }
 
