@@ -1,3 +1,15 @@
+/**
+ * This is a Vue directive used for drag.
+ * Supports both mouse and touch event.
+ * Compatible with IE 11 and above.
+ *
+ * Usage:
+ * <element v-drag="DragCallback"></element>
+ * to learn more about `DragCallback`, see definition codes below
+ *
+ * in `downcallback`, return false could abort this drag
+ * in `upcallback`, return false could stop unbind `move` and `up` events
+ */
 import throttle from "lodash/throttle";
 import { DirectiveFunction } from "vue";
 
@@ -8,9 +20,11 @@ export interface Dictionary<T> {
 const isIE = navigator.userAgent.includes("Trident");
 const isMac = navigator.userAgent.includes("Macintosh");
 
+let dragging = false;
+
 // when IE, bind pointer events, otherwise bind mouse and touch events
 // note: Chrome(55+) supports pointer events, too.
-// but to make it simpler, only use pointer events on IE
+// To make it simpler, only use pointer events on IE
 const eventTrigger: Dictionary<string[]> = isIE
   ? {
       down: ["pointerdown"],
@@ -32,25 +46,42 @@ export interface NormalizedEvent {
   meta: boolean;
 }
 
-export interface Coord {
+export interface Movement {
+  // movement compare to previous move event
   x: number;
   y: number;
+  // movement compare to down event
+  mx: number;
+  my: number;
+  // pos of down event
+  dx: number;
+  dy: number;
 }
 
 export type UniEvent = MouseEvent | TouchEvent | PointerEvent;
 
-export interface DragDropCallback {
+export interface DragCallback {
   down?: (ne: NormalizedEvent, e: UniEvent) => boolean | void;
-  move?: (movement: Coord, ne: NormalizedEvent, e: UniEvent) => void;
-  up?: (moved: boolean, ne: NormalizedEvent, e: UniEvent) => void;
+  move?: (movement: Movement, ne: NormalizedEvent, e: UniEvent) => void;
+  up?: (isClick: boolean, ne: NormalizedEvent, e: UniEvent) => boolean | void;
+  stop?: boolean;
+  prevent?: boolean;
+  capture?: boolean;
+  // enable shift key to move vertically or horizontally
+  shift?: boolean;
 }
 
 // make pointer/mouse/touch events the same for use
-const normalizeEvent = (e: UniEvent): NormalizedEvent => {
-  e.preventDefault();
-  e.stopPropagation();
+const normalizeEvent = (
+  e: UniEvent,
+  prevent: boolean = false,
+  stop: boolean = false
+): NormalizedEvent => {
+  if (prevent) e.preventDefault();
+  if (stop) e.stopPropagation();
 
-  if (e instanceof TouchEvent) {
+  // note: there is no `TouchEvent` in IE, so check its existance first
+  if (typeof TouchEvent !== "undefined" && e instanceof TouchEvent) {
     return {
       x: e.touches[0].clientX,
       y: e.touches[0].clientY,
@@ -62,8 +93,8 @@ const normalizeEvent = (e: UniEvent): NormalizedEvent => {
   }
 
   return {
-    x: e.clientX,
-    y: e.clientY,
+    x: (e as MouseEvent | PointerEvent).clientX,
+    y: (e as MouseEvent | PointerEvent).clientY,
     shift: e.shiftKey,
     alt: e.altKey,
     ctrl: isMac ? e.metaKey : e.ctrlKey,
@@ -71,50 +102,83 @@ const normalizeEvent = (e: UniEvent): NormalizedEvent => {
   };
 };
 
-const body: HTMLElement = document.body;
-
 const bind: DirectiveFunction = (el, binding) => {
-  // bind css for IE
-  if (isIE) {
-    Object.assign(el.style, {
-      msTouchAction: "none",
-      touchAction: "none",
-      msScrollChaining: "none",
-      msScrollLimit: "0 0 0 0"
-    });
-  }
-
-  const callbacks: DragDropCallback = binding.value;
+  const callbacks: DragCallback = binding.value;
 
   let previousEvent: NormalizedEvent;
   let downEvent: NormalizedEvent;
+  let direction: "x" | "y" | "";
 
   const handleEventDown = (e: UniEvent): void => {
-    previousEvent = normalizeEvent(e);
+    // important: should cancel throttle after event up
+    handleEventMove.cancel();
+
+    previousEvent = normalizeEvent(e, callbacks.prevent, callbacks.stop);
     downEvent = previousEvent;
 
     if (callbacks.down) {
       const result = callbacks.down(previousEvent, e);
 
-      if (result === false) {
-        return;
-      }
+      if (result === false) return;
     }
 
-    bindEvents("move", body, true);
-    bindEvents("up", body, true);
+    // in handleEventUp, return false could prevent unbind events
+    // you may think there could be multiple binding here.
+    // actually, events with the same listener will only bind once
+    // tslint:disable max-line-length
+    // see at https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#Multiple_identical_event_listeners
+    // also, bind `move` and `up` events on window instead of `body` or `document`
+    // this could make `move` and `up` works even user drag outside browser window
+    bindEvents("move", window, callbacks.capture);
+    bindEvents("up", window, callbacks.capture);
+    dragging = true;
   };
 
   const handleEventMove = throttle((e: UniEvent) => {
-    const ne = normalizeEvent(e);
+    const ne = normalizeEvent(e, callbacks.prevent, callbacks.stop);
+
+    let mx = ne.x - downEvent.x;
+    let my = ne.y - downEvent.y;
+
+    // deal with shift key
+    if (callbacks.shift) {
+      if (ne.shift) {
+        // set a direction if not
+        if (!direction) {
+          direction = Math.abs(mx) > Math.abs(my) ? "x" : "y";
+        }
+
+        if (direction === "x") {
+          my = 0;
+          ne.y = downEvent.y;
+        } else if (direction === "y") {
+          mx = 0;
+          ne.x = downEvent.x;
+        }
+      } else {
+        // if shift key not pressed anymore, should reset direction
+        direction = "";
+      }
+    }
 
     // note: modern browser support e.movementX & e.movementY as movement,
     // but IE & Safari doesn't support it so we need to calc it manually
+    const x = ne.x - previousEvent.x;
+    const y = ne.y - previousEvent.y;
+
+    // Chrome bug: mousedown will trigger a mousemove event even if mouse doesn't move,
+    // need to check if there is no movement, should not trigger move callback
+    if (!x && !y) return;
+
     if (callbacks.move) {
       callbacks.move(
         {
-          x: ne.x - previousEvent.x,
-          y: ne.y - previousEvent.y
+          x,
+          y,
+          mx,
+          my,
+          dx: downEvent.x,
+          dy: downEvent.y
         },
         ne,
         e
@@ -125,22 +189,27 @@ const bind: DirectiveFunction = (el, binding) => {
   }, 60);
 
   const handleEventUp = (e: UniEvent) => {
+    // clear direction
+    direction = "";
+
     // important: should cancel throttle after event up
     handleEventMove.cancel();
-
-    previousEvent = normalizeEvent(e);
+    previousEvent = normalizeEvent(e, callbacks.prevent, callbacks.stop);
 
     // return current pos and isClick
     if (callbacks.up) {
-      callbacks.up(
+      const result = callbacks.up(
         previousEvent.x === downEvent.x && previousEvent.y === downEvent.y,
         previousEvent,
         e
       );
+
+      if (result === false) return;
     }
 
-    unbindEvents("move", body, true);
-    unbindEvents("up", body, true);
+    unbindEvents("move", window, callbacks.capture);
+    unbindEvents("up", window, callbacks.capture);
+    dragging = false;
   };
 
   const handleEvents: Dictionary<(e: UniEvent) => void> = {
@@ -151,35 +220,40 @@ const bind: DirectiveFunction = (el, binding) => {
 
   const bindEvents = (
     action: string,
-    elem: HTMLElement,
-    captured: boolean = false
+    elem: HTMLElement | Window,
+    capture: boolean = false
   ) => {
     eventTrigger[action].forEach((type: string) => {
       elem.addEventListener(
         type,
         handleEvents[action] as EventListener,
-        captured
+        capture
       );
     });
   };
 
   const unbindEvents = (
     action: string,
-    elem: HTMLElement,
-    captured: boolean = false
+    elem: HTMLElement | Window,
+    capture: boolean = false
   ) => {
     eventTrigger[action].forEach((type: string) => {
       elem.removeEventListener(
         type,
         handleEvents[action] as EventListener,
-        captured
+        capture
       );
     });
   };
 
-  bindEvents("down", el, true);
+  bindEvents("down", el, callbacks.capture);
 };
 
 export default {
   bind
 };
+
+/**
+ * to check if there is anything dragging at current time
+ */
+export const isDragging = () => dragging;

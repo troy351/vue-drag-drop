@@ -18,13 +18,13 @@ This library use MouseEvent and TouchEvent (for IE 10+ using PointerEvent), so i
 ```html
 <template>
     <div v-drag-drop="handler"
-         style="width:100px;height:100px;background:black;position:absolute;" 
+         style="width:100px;height:100px;background:black;position:absolute;"
          :style="{left:x+'px', top:y+'px'}">
     </div>
 </template>
 
 <script>
-import DragDrop from "./drag.drop";
+import DragDrop, { isDragging } from "./drag.drop";
 
 export default {
   directives: {
@@ -42,6 +42,10 @@ export default {
         down: this.down,
         move: this.move,
         up: this.up,
+        stop: true, // stopPropagation or not, default false
+        prevent: true, // preventDefault or not, default false
+        capture: true, // use captured or not, default false
+        shift: false   // allow press shift key to move vertically or horizontally
       };
     },
   },
@@ -54,9 +58,14 @@ export default {
       this.x += movement.x;
       this.y += movement.y;
     },
-    up(moved, ne, e) {
+    up(isClick, ne, e) {
       // hander here
     },
+    someMethods() {
+      if (isDragging()) {
+        // do something here only if something is being dragged
+      }
+    }
   },
 };
 </script>
@@ -66,8 +75,9 @@ export default {
 
 **see the TypeScript version for more details**
 
-* `e`: the original event, depending on which event triggered
-* `ne`: NormalizedEvent, make MouseEvent/TouchEvent/PointerEvent all the same format, see detail below
+- `e`: the original event, depending on which event triggered
+- `ne`: NormalizedEvent, make MouseEvent/TouchEvent/PointerEvent all the same format, see detail below
+
 ```TypeScript
 export interface NormalizedEvent {
   x: number; // clientX
@@ -78,15 +88,23 @@ export interface NormalizedEvent {
   meta: boolean; // meta key pressed (on macOS is ctrl key)
 }
 ```
-* `movement`: the movement compared to the previous move event, see detail below
+
+- `movement`: the movement, see detail below
+
 ```TypeScript
 export interface Movement {
-  x: number; // movementX
-  y: number; // movementY
+  x: number; // movementX, compared to the previous move event
+  y: number; // movementY, compared to the previous move event
+  mx: number; // movementX, compared to down event
+  my: number; // movementY, compared to down event
+  dx: number; // downX, x of down event
+  dy: number; // downY, y of down event
 }
 ```
-* `moved`: actually moved or not, `false` stands for click
+
+- `isClick`: actually moved or not, `true` stands for click
 
 ### Tips
 
 in `down` handler, you can `return false` to cancel the drag
+in `up` handler, you can `return false` to cancel unbind drag
