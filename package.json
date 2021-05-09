@@ -4,7 +4,7 @@
   "description": "A Vue.js directive that providing drag and drop capability, both mouse and touch are supported",
   "author": "troy",
   "dependencies": {
-    "lodash": "^4.17.15",
+    "lodash": "^4.17.21",
     "vue": "^2.6.10"
   },
   "devDependencies": {
